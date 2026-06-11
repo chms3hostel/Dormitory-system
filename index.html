@@ -823,6 +823,7 @@ input[type="date"],input[type="time"]{color-scheme:dark}
     "skill_stat":"skillStats","complaint":"complaints","device":"deviceApps",
     "item":"itemApps","temp_leave_count":"tempLeaveCounts",
     "fixed_late":"fixedLateCounts","sc_done":"scenarioDone",
+    "health":"healthProfiles",
     "fcm_token":"fcmTokens",
     "ci_claimed":"ciClaimed",
     "quiz_best":"quizBest",
@@ -1000,7 +1001,8 @@ var _COL_MAP = {
   "ci_claimed":    "ciClaimed",
   "quiz_best":     "quizBest",
   "quiz_today":    "quizToday",
-  "sc_done":       "scenarioDone"
+  "sc_done":       "scenarioDone",
+  "health":         "healthProfiles"
 };
 
 function _keyToPath(k){
@@ -1655,6 +1657,7 @@ function renderShortcuts(){
   grid.appendChild(mkSh("📚","知识闯关","Quiz",function(){gotoGameTab("quiz");}));
   grid.appendChild(mkSh("📋","申请与投诉","Apply",function(){document.querySelectorAll(".stu-nav-btn").forEach(function(b){b.classList.toggle("on",b.dataset.sp==="apply");});document.querySelectorAll(".stu-page").forEach(function(p){p.classList.remove("on");});document.getElementById("SP_apply").classList.add("on");renderApplyPage();}));
   grid.appendChild(mkSh("📢","公告栏","Notice",function(){document.querySelectorAll(".stu-nav-btn").forEach(function(b){b.classList.toggle("on",b.dataset.sp==="notice");});document.querySelectorAll(".stu-page").forEach(function(p){p.classList.remove("on");});document.getElementById("SP_notice").classList.add("on");renderStudentNotices();}));
+  grid.appendChild(mkSh("🏥","健康资料","Health",function(){openMyHealth();}));
   if(isPrefect){grid.appendChild(mkSh("🛡️","审核申请","Review",function(){openReviewPanel();}));
     grid.appendChild(mkSh("📋","点名","Roll Call",function(){openRollCall();}));
     grid.appendChild(mkSh("📱","手机收缴","Phones",function(){openPhoneCollection();}));
@@ -2756,7 +2759,7 @@ async function renderStus(q){
     [{i:"📚",t:s.grade},{i:s.gender==="M"?"👦":"👧",t:s.gender==="M"?"男":"女"},{i:"🛏️",t:s.room+"室"}].forEach(function(item){var chip=document.createElement("div");chip.style.cssText="background:#111827;border-radius:6px;padding:3px 9px;font-size:12px;color:#94a3b8";chip.textContent=item.i+" "+item.t;r2.appendChild(chip);});
     card.appendChild(r2);
     var acts=document.createElement("div");acts.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
-    (function(stu){acts.appendChild(mkBtn("✏️ 编辑","bg sm",function(){openEditStu(stu);}));acts.appendChild(mkBtn("🔑 重置密码","bw sm",function(){confirmM("确定将 "+stu.name+" 的密码重置为 sjc2025？\n\n说明：如该学生曾登录过，需在 Firebase Console → Authentication 中删除其账号（"+stu.id+"@dorm.chms3.edu），重置才会对 Firebase Auth 生效。",async function(){
+    (function(stu){acts.appendChild(mkBtn("✏️ 编辑","bg sm",function(){openEditStu(stu);}));acts.appendChild(mkBtn("🏥 健康档案","bg sm",function(){openHealthProfile(stu);}));acts.appendChild(mkBtn("🔑 重置密码","bw sm",function(){confirmM("确定将 "+stu.name+" 的密码重置为 sjc2025？\n\n说明：如该学生曾登录过，需在 Firebase Console → Authentication 中删除其账号（"+stu.id+"@dorm.chms3.edu），重置才会对 Firebase Auth 生效。",async function(){
   var d=await DB.get("stu:"+stu.id);
   if(d){d.pwd="sjc2025";d.authRevoked=true;await DB.set("stu:"+stu.id,d);}
   toast("✅ "+stu.name+" 密码已重置为 sjc2025。若该生曾登录，请同步在 Firebase Console 删除其 Auth 账号。");renderStus();
@@ -6082,7 +6085,7 @@ async function renderStus(q){
     [{i:"📚",t:s.grade},{i:s.gender==="M"?"👦":"👧",t:s.gender==="M"?"男":"女"},{i:"🛏️",t:s.room+"室"}].forEach(function(item){var chip=document.createElement("div");chip.style.cssText="background:#111827;border-radius:6px;padding:3px 9px;font-size:12px;color:#94a3b8";chip.textContent=item.i+" "+item.t;r2.appendChild(chip);});
     card.appendChild(r2);
     var acts=document.createElement("div");acts.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
-    (function(stu){acts.appendChild(mkBtn("✏️ 编辑","bg sm",function(){openEditStu(stu);}));acts.appendChild(mkBtn("🔑 重置密码","bw sm",function(){confirmM("确定将 "+stu.name+" 的密码重置为 sjc2025？\n\n说明：如该学生曾登录过，需在 Firebase Console → Authentication 中删除其账号（"+stu.id+"@dorm.chms3.edu），重置才会对 Firebase Auth 生效。",async function(){
+    (function(stu){acts.appendChild(mkBtn("✏️ 编辑","bg sm",function(){openEditStu(stu);}));acts.appendChild(mkBtn("🏥 健康档案","bg sm",function(){openHealthProfile(stu);}));acts.appendChild(mkBtn("🔑 重置密码","bw sm",function(){confirmM("确定将 "+stu.name+" 的密码重置为 sjc2025？\n\n说明：如该学生曾登录过，需在 Firebase Console → Authentication 中删除其账号（"+stu.id+"@dorm.chms3.edu），重置才会对 Firebase Auth 生效。",async function(){
   var d=await DB.get("stu:"+stu.id);
   if(d){d.pwd="sjc2025";d.authRevoked=true;await DB.set("stu:"+stu.id,d);}
   toast("✅ "+stu.name+" 密码已重置为 sjc2025。若该生曾登录，请同步在 Firebase Console 删除其 Auth 账号。");renderStus();
@@ -7712,30 +7715,456 @@ function renderProfileDuty(){
 function renderDutyShortcut(grid){}
 
 // ══════════════════════════════════════════════════════
+// 健康档案（Admin 专用）
+// ══════════════════════════════════════════════════════
+async function openHealthProfile(stu){
+  var h = await DB.get("health:"+stu.id) || {};
+  var b = OM("🏥 健康档案："+stu.name);
+
+  // ── 标题标注
+  var badge = document.createElement("div");
+  badge.style.cssText = "display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap";
+  badge.innerHTML = '<span style="background:#1e2a3a;border-radius:6px;padding:3px 10px;font-size:11px;color:#94a3b8">'+esc(stu.id)+'</span>'
+    +'<span style="background:#1e2a3a;border-radius:6px;padding:3px 10px;font-size:11px;color:#94a3b8">'+esc(stu.room)+'室</span>'
+    +'<span style="background:#1e2a3a;border-radius:6px;padding:3px 10px;font-size:11px;color:#94a3b8">'+(stu.gender==="M"?"👦 男":"👧 女")+'</span>';
+  b.appendChild(badge);
+
+  // ── 辅助函数
+  function secTitle(icon, label, color){
+    var d = document.createElement("div");
+    d.style.cssText = "font-size:12px;font-weight:800;color:"+(color||"#94a3b8")+";margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid #1e2a3a";
+    d.textContent = icon+" "+label;
+    b.appendChild(d);
+  }
+  function field(label, el){ return mkF(b, label, el); }
+  function inp(val, ph){ var i=document.createElement("input");i.type="text";i.value=val||"";i.placeholder=ph||"";i.style.cssText="width:100%;background:#1e2a3a;border:1px solid #2d3748;border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;box-sizing:border-box";return i; }
+  function sel(opts, val){ var s=document.createElement("select");s.style.cssText="width:100%;background:#1e2a3a;border:1px solid #2d3748;border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px";opts.forEach(function(o){var op=document.createElement("option");op.value=o;op.textContent=o;if(o===val)op.selected=true;s.appendChild(op);});return s; }
+  function textarea(val, ph, rows){ var t=document.createElement("textarea");t.value=val||"";t.placeholder=ph||"";t.rows=rows||3;t.style.cssText="width:100%;background:#1e2a3a;border:1px solid #2d3748;border-radius:8px;padding:8px 10px;color:#e2e8f0;font-size:13px;box-sizing:border-box;resize:none";return t; }
+  function row2(a,b2){ var d=document.createElement("div");d.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px";d.appendChild(a);d.appendChild(b2);b.appendChild(d); }
+
+  // ══ 1. 基本健康信息 ══
+  secTitle("📏","基本健康信息","#64748b");
+  var htI = inp(h.height,"身高 cm");
+  var wtI = inp(h.weight,"体重 kg");
+  var bgS = sel(["—","A","B","O","AB","不明"],h.bloodType||"—");
+  row2(mkF(null,"身高",htI), mkF(null,"体重",wtI));
+  field("血型", bgS);
+
+  // ══ 2. 饮食限制 ══
+  secTitle("🍽️","饮食限制","#64748b");
+  var dietS = sel(["无限制","素食者","纯素食","清真饮食","其他"],h.diet||"无限制");
+  field("饮食类型", dietS);
+  var allergyI = inp(h.allergy,"食物过敏（如：花生、海鲜等）");
+  field("食物过敏", allergyI);
+
+  // ══ 3. 安全提醒（楼长可见）══
+  secTitle("🚨","安全提醒（楼长可见）","#f59e0b");
+  var alertNote = document.createElement("div");
+  alertNote.style.cssText = "font-size:11px;color:#64748b;margin-bottom:8px";
+  alertNote.textContent = "以下信息楼长在紧急情况下可查看，请如实填写";
+  b.appendChild(alertNote);
+
+  var condOpts = ["哮喘","严重过敏（需备EpiPen）","癫痫","心脏病","糖尿病","高血压","其他"];
+  var condChecks = [];
+  var condWrap = document.createElement("div");
+  condWrap.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px";
+  var savedConds = h.conditions || [];
+  condOpts.forEach(function(c){
+    var wrap = document.createElement("label");
+    wrap.style.cssText = "display:flex;align-items:center;gap:6px;background:#1e2a3a;border-radius:6px;padding:6px 10px;font-size:12px;color:#e2e8f0;cursor:pointer";
+    var chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.checked = savedConds.indexOf(c) >= 0;
+    wrap.appendChild(chk);
+    wrap.appendChild(document.createTextNode(c));
+    condWrap.appendChild(wrap);
+    condChecks.push({label:c, chk:chk});
+  });
+  b.appendChild(condWrap);
+  var alertDetailI = textarea(h.alertDetail,"紧急情况处理说明（如：哮喘发作时请立即使用蓝色吸入器…）",3);
+  field("紧急处理说明", alertDetailI);
+
+  // ══ 4. 紧急联系人 ══
+  secTitle("📞","紧急联系人","#10b981");
+  var p1NameI = inp(h.parent1Name,"家长姓名");
+  var p1PhoneI = inp(h.parent1Phone,"家长电话");
+  row2(mkF(null,"家长姓名",p1NameI), mkF(null,"家长电话",p1PhoneI));
+  var ec1NameI = inp(h.ec1Name,"紧急联系人姓名");
+  var ec1RelI = inp(h.ec1Rel,"关系（如：舅舅）");
+  row2(mkF(null,"紧急联系人",ec1NameI), mkF(null,"关系",ec1RelI));
+  var ec1PhoneI = inp(h.ec1Phone,"紧急联系人电话");
+  field("紧急联系人电话", ec1PhoneI);
+
+  // ══ 5. 敏感医疗记录（仅Admin）══
+  secTitle("🔒","敏感医疗记录（仅管理员可见）","#ef4444");
+  var sensitiveNote = document.createElement("div");
+  sensitiveNote.style.cssText = "font-size:11px;color:#64748b;margin-bottom:8px";
+  sensitiveNote.textContent = "以下信息严格保密，仅管理员可查看";
+  b.appendChild(sensitiveNote);
+  var chronicI = textarea(h.chronic,"慢性病记录（如：地中海贫血、先天性心脏病等）",2);
+  field("慢性病", chronicI);
+  var menstrualI = textarea(h.menstrual,"月经/妇科相关备注（如：经期痛、不规律等）",2);
+  if(stu.gender==="F") field("月经相关", menstrualI);
+  var mentalI = textarea(h.mental,"心理健康备注（如：焦虑症、已在接受辅导等）",2);
+  field("心理健康", mentalI);
+  var medicineI = textarea(h.medicine,"用药记录（如：每天服用xxx药）",2);
+  field("用药记录", medicineI);
+
+  // ══ 6. 请假关联分析 ══
+  secTitle("📊","请假关联分析","#6366f1");
+  var analysisDiv = document.createElement("div");
+  analysisDiv.style.cssText = "background:#0e1422;border-radius:8px;padding:12px;font-size:12px;color:#64748b";
+  analysisDiv.textContent = "加载中…";
+  b.appendChild(analysisDiv);
+
+  // 异步加载请假分析
+  (async function(){
+    var leaveKeys = await DB.list("leave:"+stu.id+":");
+    var leaves = [];
+    for(var i=0;i<leaveKeys.length;i++){
+      var lv = await DB.get(leaveKeys[i]);
+      if(lv) leaves.push(lv);
+    }
+    var thisMonth = new Date().toISOString().slice(0,7);
+    var monthLeaves = leaves.filter(function(l){ return l.createdAt && new Date(l.createdAt).toISOString().slice(0,7)===thisMonth; });
+    var sickLeaves = leaves.filter(function(l){ return l.type==="sick"||( l.reason&&(l.reason.indexOf("生病")>=0||l.reason.indexOf("痛")>=0||l.reason.indexOf("不舒服")>=0)); });
+
+    var html = '<div style="color:#e2e8f0;font-weight:600;margin-bottom:6px">本月请假：<span style="color:#f59e0b">'+monthLeaves.length+'</span> 次 &nbsp;·&nbsp; 历史总计：<span style="color:#94a3b8">'+leaves.length+'</span> 次</div>';
+
+    if(monthLeaves.length >= 3){
+      html += '<div style="color:#ef4444;margin-bottom:4px">⚠️ 本月请假次数较多，建议关注健康状况</div>';
+    }
+    if(sickLeaves.length >= 3){
+      html += '<div style="color:#f59e0b;margin-bottom:4px">🔍 多次因病请假（'+sickLeaves.length+'次），建议核实健康档案</div>';
+    }
+    if(leaves.length === 0){
+      html += '<div style="color:#10b981">✅ 历史无请假记录</div>';
+    }
+
+    // 最近3次请假
+    var recent = leaves.slice(-3).reverse();
+    if(recent.length){
+      html += '<div style="margin-top:8px;color:#64748b;font-size:11px">最近请假：</div>';
+      recent.forEach(function(l){
+        var dt = l.createdAt ? new Date(l.createdAt).toLocaleDateString("zh-CN") : "-";
+        html += '<div style="padding:3px 0;border-bottom:1px solid #1e2a3a;color:#94a3b8">'+dt+' — '+(l.reason?l.reason.slice(0,30):"无备注")+'</div>';
+      });
+    }
+    analysisDiv.innerHTML = html;
+  })();
+
+  // ══ Admin 备注 ══
+  secTitle("📝","管理员备注","#64748b");
+  var adminNoteI = textarea(h.adminNote,"内部备注（学生不可见）",3);
+  field("备注", adminNoteI);
+
+  // ── 保存按钮
+  var saveBtn = mkBtn("💾 保存健康档案","bp",async function(){
+    var conds = condChecks.filter(function(c){return c.chk.checked;}).map(function(c){return c.label;});
+    var data = {
+      stuId: stu.id,
+      height: htI.value.trim(),
+      weight: wtI.value.trim(),
+      bloodType: bgS.value,
+      diet: dietS.value,
+      allergy: allergyI.value.trim(),
+      conditions: conds,
+      alertDetail: alertDetailI.value.trim(),
+      parent1Name: p1NameI.value.trim(),
+      parent1Phone: p1PhoneI.value.trim(),
+      ec1Name: ec1NameI.value.trim(),
+      ec1Rel: ec1RelI.value.trim(),
+      ec1Phone: ec1PhoneI.value.trim(),
+      chronic: chronicI.value.trim(),
+      menstrual: stu.gender==="F" ? menstrualI.value.trim() : "",
+      mental: mentalI.value.trim(),
+      medicine: medicineI.value.trim(),
+      adminNote: adminNoteI.value.trim(),
+      updatedAt: Date.now()
+    };
+    await DB.set("health:"+stu.id, data);
+    toast("✅ 健康档案已保存");
+    CM();
+  });
+  saveBtn.style.cssText += ";width:100%;margin-top:16px";
+  b.appendChild(saveBtn);
+}
+
+// 学生端：查看自己的安全提醒
+async function openMyHealth(){
+  if(!gUser) return;
+  var h = await DB.get("health:"+gUser.id);
+  var b = OM("🏥 我的健康资料");
+
+  if(!h || (!h.conditions||!h.conditions.length) && !h.alertDetail && !h.parent1Phone){
+    b.innerHTML = '<div style="color:#475569;text-align:center;padding:30px;font-size:13px">暂无健康档案记录<br><span style="font-size:11px">请联系舍监填写</span></div>';
+    return;
+  }
+
+  // 只显示非敏感信息
+  if(h.height||h.weight||h.bloodType){
+    var basicDiv = document.createElement("div");
+    basicDiv.style.cssText = "background:#111827;border-radius:10px;padding:12px;margin-bottom:12px";
+    basicDiv.innerHTML = '<div style="font-size:12px;font-weight:800;color:#94a3b8;margin-bottom:8px">📏 基本信息</div>'
+      +(h.height?'<div style="color:#e2e8f0;font-size:13px;margin-bottom:4px">身高：'+esc(h.height)+' cm</div>':"")
+      +(h.weight?'<div style="color:#e2e8f0;font-size:13px;margin-bottom:4px">体重：'+esc(h.weight)+' kg</div>':"")
+      +(h.bloodType&&h.bloodType!=="—"?'<div style="color:#e2e8f0;font-size:13px">血型：'+esc(h.bloodType)+'</div>':"");
+    b.appendChild(basicDiv);
+  }
+
+  if(h.conditions && h.conditions.length){
+    var condDiv = document.createElement("div");
+    condDiv.style.cssText = "background:#2d1b1b;border:1px solid #ef4444;border-radius:10px;padding:12px;margin-bottom:12px";
+    condDiv.innerHTML = '<div style="font-size:12px;font-weight:800;color:#ef4444;margin-bottom:8px">🚨 紧急医疗提醒</div>';
+    h.conditions.forEach(function(c){
+      var span = document.createElement("div");
+      span.style.cssText = "color:#fca5a5;font-size:13px;margin-bottom:4px";
+      span.textContent = "• "+c;
+      condDiv.appendChild(span);
+    });
+    if(h.alertDetail){
+      var ad = document.createElement("div");
+      ad.style.cssText = "color:#94a3b8;font-size:12px;margin-top:8px;padding-top:8px;border-top:1px solid #3d2020";
+      ad.textContent = h.alertDetail;
+      condDiv.appendChild(ad);
+    }
+    b.appendChild(condDiv);
+  }
+
+  if(h.diet && h.diet!=="无限制"){
+    var dietDiv = document.createElement("div");
+    dietDiv.style.cssText = "background:#111827;border-radius:10px;padding:12px;margin-bottom:12px";
+    dietDiv.innerHTML = '<div style="font-size:12px;font-weight:800;color:#94a3b8;margin-bottom:6px">🍽️ 饮食</div>'
+      +'<div style="color:#e2e8f0;font-size:13px">'+esc(h.diet)+'</div>'
+      +(h.allergy?'<div style="color:#f59e0b;font-size:12px;margin-top:4px">过敏：'+esc(h.allergy)+'</div>':"");
+    b.appendChild(dietDiv);
+  }
+
+  if(h.parent1Phone){
+    var ecDiv = document.createElement("div");
+    ecDiv.style.cssText = "background:#111827;border-radius:10px;padding:12px";
+    ecDiv.innerHTML = '<div style="font-size:12px;font-weight:800;color:#94a3b8;margin-bottom:8px">📞 紧急联系人</div>'
+      +(h.parent1Name?'<div style="color:#e2e8f0;font-size:13px;margin-bottom:4px">家长：'+esc(h.parent1Name)+' · '+esc(h.parent1Phone)+'</div>':"")
+      +(h.ec1Name?'<div style="color:#e2e8f0;font-size:13px">'+esc(h.ec1Name)+(h.ec1Rel?' ('+esc(h.ec1Rel)+')':"")+'  · '+esc(h.ec1Phone)+'</div>':"");
+    b.appendChild(ecDiv);
+  }
+}
+
+// 楼长端：查看学生安全提醒
+async function openStuHealthAlert(stu){
+  var h = await DB.get("health:"+stu.id);
+  var b = OM("🚨 "+stu.name+" — 健康提醒");
+
+  if(!h || !h.conditions || !h.conditions.length){
+    b.innerHTML = '<div style="color:#475569;text-align:center;padding:30px;font-size:13px">无特殊医疗提醒</div>';
+    return;
+  }
+
+  var condDiv = document.createElement("div");
+  condDiv.style.cssText = "background:#2d1b1b;border:1px solid #ef4444;border-radius:10px;padding:14px;margin-bottom:12px";
+  condDiv.innerHTML = '<div style="font-size:13px;font-weight:800;color:#ef4444;margin-bottom:10px">⚠️ 该学生有以下医疗状况，请注意</div>';
+  h.conditions.forEach(function(c){
+    var item = document.createElement("div");
+    item.style.cssText = "color:#fca5a5;font-size:13px;margin-bottom:6px;padding:6px 8px;background:#3d1f1f;border-radius:6px";
+    item.textContent = "• "+c;
+    condDiv.appendChild(item);
+  });
+  if(h.alertDetail){
+    var ad = document.createElement("div");
+    ad.style.cssText = "color:#94a3b8;font-size:12px;margin-top:10px;padding-top:10px;border-top:1px solid #4d2525";
+    ad.innerHTML = "<b style='color:#e2e8f0'>处理说明：</b><br>"+esc(h.alertDetail);
+    condDiv.appendChild(ad);
+  }
+  b.appendChild(condDiv);
+
+  if(h.parent1Phone){
+    var ecDiv = document.createElement("div");
+    ecDiv.style.cssText = "background:#111827;border-radius:10px;padding:12px";
+    ecDiv.innerHTML = '<div style="font-size:12px;font-weight:800;color:#94a3b8;margin-bottom:8px">📞 紧急联系</div>'
+      +(h.parent1Name?'<div style="color:#e2e8f0;font-size:13px;margin-bottom:4px">👨‍👩‍👦 '+esc(h.parent1Name)+' · <a href="tel:'+esc(h.parent1Phone)+'" style="color:#6366f1">'+esc(h.parent1Phone)+'</a></div>':"")
+      +(h.ec1Name?'<div style="color:#e2e8f0;font-size:13px">'+esc(h.ec1Name)+(h.ec1Rel?' ('+esc(h.ec1Rel)+')':"")+'  · <a href="tel:'+esc(h.ec1Phone)+'" style="color:#6366f1">'+esc(h.ec1Phone)+'</a></div>':"");
+    b.appendChild(ecDiv);
+  }
+}
+
+
+// ══════════════════════════════════════════════════════
 // 点名查看（Admin tab 10）
 // ══════════════════════════════════════════════════════
-var _rollAdminRows = []; // 全局存储点名数据
+var _rollAdminRows = [];
+var _rollAdminStus = [];
+
+async function renderRollAdmin(){
+  var P = document.getElementById("p10");
+  P.innerHTML = '<div style="color:#475569;font-size:13px;text-align:center;padding:40px">加载中…</div>';
+
+  // 加载学生列表
+  var allKeys = await DB.list("stu:");
+  _rollAdminStus = [];
+  for(var i=0;i<allKeys.length;i++){
+    var s = await DB.get(allKeys[i]);
+    if(s) _rollAdminStus.push(s);
+  }
+  _rollAdminStus.sort(function(a,b){ return a.name.localeCompare(b.name); });
+
+  P.innerHTML = "";
+
+  // 标题
+  var title = document.createElement("div");
+  title.style.cssText = "font-size:16px;font-weight:800;color:#e2e8f0;margin-bottom:12px";
+  title.textContent = "📋 点名查看";
+  P.appendChild(title);
+
+  // 日期选择器
+  var dateRow = document.createElement("div");
+  dateRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap";
+  var dateInp = document.createElement("input");
+  dateInp.type = "date";
+  dateInp.value = todayStr();
+  dateInp.style.cssText = "background:#1e2a3a;border:1px solid #2d3748;border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;flex:1";
+  var loadBtn = mkBtn("🔍 查看","bp sm",function(){
+    _loadRollForDate(dateInp.value);
+  });
+  var exportBtn = mkBtn("📥 导出当天","bg sm",function(){
+    _exportRollCSV(dateInp.value, dateInp.value);
+  });
+  // 快速范围按钮
+  var rangeRow = document.createElement("div");
+  rangeRow.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px";
+  var quickBtns = [
+    {l:"本周",fn:function(){ _exportRollRange(7); }},
+    {l:"本月",fn:function(){ _exportRollRange(30); }},
+    {l:"自定义范围",fn:function(){ _showRangeExport(); }}
+  ];
+  for(var qi=0;qi<quickBtns.length;qi++){
+    var qb = mkBtn("📥 导出"+quickBtns[qi].l,"bw sm",quickBtns[qi].fn);
+    rangeRow.appendChild(qb);
+  }
+  dateRow.appendChild(dateInp);
+  dateRow.appendChild(loadBtn);
+  dateRow.appendChild(exportBtn);
+  P.appendChild(dateRow);
+  P.appendChild(rangeRow);
+
+  // 统计卡片区
+  var statArea = document.createElement("div");
+  statArea.id = "roll-stat-area";
+  P.appendChild(statArea);
+
+  // 筛选按钮
+  var filterBar = document.createElement("div");
+  filterBar.id = "roll-filters";
+  filterBar.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;display:none";
+  var filterDefs = [
+    {k:"all",l:"全部"},
+    {k:"absent",l:"❌ 缺席"},
+    {k:"late",l:"⏰ 迟到"},
+    {k:"late5",l:"⚠️ 迟到5+"},
+    {k:"sick",l:"🤒 病假"},
+    {k:"activity",l:"🏃 活动"},
+    {k:"present",l:"✅ 出席"}
+  ];
+  for(var fi=0;fi<filterDefs.length;fi++){
+    var btn = document.createElement("button");
+    btn.textContent = filterDefs[fi].l;
+    btn.setAttribute("data-f", filterDefs[fi].k);
+    btn.setAttribute("onclick","_renderRollList('"+filterDefs[fi].k+"')");
+    btn.style.cssText = "padding:5px 12px;border:none;border-radius:6px;font-size:12px;cursor:pointer;background:#1e2a3a;color:#94a3b8";
+    filterBar.appendChild(btn);
+  }
+  P.appendChild(filterBar);
+
+  // 列表区
+  var listDiv = document.createElement("div");
+  listDiv.id = "roll-list";
+  P.appendChild(listDiv);
+
+  // 默认加载今天
+  _loadRollForDate(todayStr());
+}
+
+async function _loadRollForDate(dateStr){
+  var statArea = document.getElementById("roll-stat-area");
+  var listDiv = document.getElementById("roll-list");
+  var filterBar = document.getElementById("roll-filters");
+  if(!statArea||!listDiv) return;
+
+  statArea.innerHTML = '<div style="color:#475569;font-size:12px;padding:8px">加载中…</div>';
+  listDiv.innerHTML = "";
+  if(filterBar) filterBar.style.display = "none";
+
+  _rollAdminRows = [];
+  for(var si=0;si<_rollAdminStus.length;si++){
+    var stu = _rollAdminStus[si];
+    for(var ti=0;ti<CI_TASKS.length;ti++){
+      var task = CI_TASKS[ti];
+      var log = await DB.get("cilog:"+stu.id+":"+dateStr+":"+task.id);
+      if(log) _rollAdminRows.push({stu:stu, task:task, status:log.status, date:dateStr});
+    }
+  }
+
+  // 统计
+  var counts = {present:0,late:0,late5:0,absent:0,sick:0,activity:0};
+  for(var ri=0;ri<_rollAdminRows.length;ri++){
+    var st = _rollAdminRows[ri].status;
+    if(counts[st]!==undefined) counts[st]++;
+  }
+
+  statArea.innerHTML = "";
+  var sub = document.createElement("div");
+  sub.style.cssText = "font-size:11px;color:#475569;margin-bottom:10px";
+  sub.textContent = dateStr + " · 共" + _rollAdminRows.length + "条记录";
+  statArea.appendChild(sub);
+
+  var statGrid = document.createElement("div");
+  statGrid.style.cssText = "display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px";
+  var statDefs = [
+    {k:"present",l:"出席",c:"#10b981",icon:"✅"},
+    {k:"late",l:"迟到",c:"#f59e0b",icon:"⏰"},
+    {k:"late5",l:"迟到5+",c:"#ef4444",icon:"⚠️"},
+    {k:"absent",l:"缺席",c:"#ef4444",icon:"❌"},
+    {k:"sick",l:"病假",c:"#6366f1",icon:"🤒"},
+    {k:"activity",l:"活动",c:"#64748b",icon:"🏃"}
+  ];
+  for(var di=0;di<statDefs.length;di++){
+    var sd = statDefs[di];
+    var card = document.createElement("div");
+    card.style.cssText = "background:#111827;border:1px solid #1e2a3a;border-radius:10px;padding:10px;text-align:center";
+    card.innerHTML = '<div style="font-size:16px">'+sd.icon+'</div>'
+      +'<div style="font-size:20px;font-weight:800;color:'+sd.c+'">'+counts[sd.k]+'</div>'
+      +'<div style="font-size:11px;color:#64748b">'+sd.l+'</div>';
+    statGrid.appendChild(card);
+  }
+  statArea.appendChild(statGrid);
+
+  if(filterBar) filterBar.style.display = "flex";
+
+  if(!_rollAdminRows.length){
+    listDiv.innerHTML = '<div style="color:#475569;font-size:13px;text-align:center;padding:30px">'+dateStr+' 暂无点名记录</div>';
+    return;
+  }
+  _renderRollList("all");
+}
 
 function _renderRollList(filter){
   var listDiv = document.getElementById("roll-list");
   var filterBar = document.getElementById("roll-filters");
   if(!listDiv) return;
 
-  // 更新按钮样式
   if(filterBar){
     var btns = filterBar.getElementsByTagName("button");
     for(var bi=0;bi<btns.length;bi++){
-      var active = btns[bi].getAttribute("data-f") === filter;
-      btns[bi].style.background = active ? "#6366f1" : "#1e2a3a";
-      btns[bi].style.color = active ? "#fff" : "#94a3b8";
+      var active = btns[bi].getAttribute("data-f")===filter;
+      btns[bi].style.background = active?"#6366f1":"#1e2a3a";
+      btns[bi].style.color = active?"#fff":"#94a3b8";
     }
   }
 
-  var rows = filter === "all" ? _rollAdminRows : _rollAdminRows.filter(function(r){ return r.status===filter; });
+  var rows = filter==="all" ? _rollAdminRows : _rollAdminRows.filter(function(r){return r.status===filter;});
   listDiv.innerHTML = "";
 
   if(!rows.length){
-    listDiv.innerHTML = '<div style="color:#475569;font-size:13px;text-align:center;padding:20px">无记录</div>';
+    listDiv.innerHTML = '<div style="color:#475569;font-size:13px;text-align:center;padding:16px">无符合记录</div>';
     return;
   }
 
@@ -7749,132 +8178,138 @@ function _renderRollList(filter){
     row.innerHTML =
       '<span style="flex:1;font-weight:600;color:#e2e8f0;font-size:14px">'+esc(r.stu.name)+'</span>'+
       '<span style="color:#475569;font-size:11px">'+esc(r.stu.room)+'室</span>'+
-      '<span style="color:#64748b;font-size:11px;min-width:60px;text-align:center">'+esc(r.task.name)+'</span>'+
+      '<span style="color:#64748b;font-size:11px;min-width:55px;text-align:center">'+esc(r.task.name)+'</span>'+
       '<span style="color:'+(sColors[r.status]||"#64748b")+';font-weight:700;font-size:13px;min-width:44px;text-align:right">'+(sLabels[r.status]||r.status)+'</span>';
     listDiv.appendChild(row);
   }
 }
 
-async function renderRollAdmin(){
-  var P = document.getElementById("p10");
-  P.innerHTML = '<div style="color:#475569;font-size:13px;text-align:center;padding:40px">加载中…</div>';
-
-  var today = todayStr();
-  var allKeys = await DB.list("stu:");
-  var allStus = [];
-  for(var i=0;i<allKeys.length;i++){
-    var s = await DB.get(allKeys[i]);
-    if(s) allStus.push(s);
+function _exportRollCSV(dateStr){
+  if(!_rollAdminRows.length){
+    toast("该日期暂无点名记录",true);
+    return;
   }
-  allStus.sort(function(a,b){ return a.name.localeCompare(b.name); });
-
-  // 使用局部变量 rows（避免全局变量问题）
-  var rows = [];
-  for(var si=0;si<allStus.length;si++){
-    var stu = allStus[si];
-    for(var ti=0;ti<CI_TASKS.length;ti++){
-      var task = CI_TASKS[ti];
-      var log = await DB.get("cilog:"+stu.id+":"+today+":"+task.id);
-      if(log) rows.push({stu:stu, task:task, status:log.status});
-    }
-  }
-  _rollAdminRows = rows; // 同步到全局（供筛选按钮用）
-
-  // 统计
-  var counts = {present:0,late:0,late5:0,absent:0,sick:0,activity:0};
-  for(var ri=0;ri<rows.length;ri++){
-    var st = rows[ri].status;
-    if(counts[st]!==undefined) counts[st]++;
-  }
-
-  P.innerHTML = "";
-
-  // 标题
-  var title = document.createElement("div");
-  title.style.cssText = "font-size:16px;font-weight:800;color:#e2e8f0;margin-bottom:4px";
-  title.textContent = "📋 今日点名情况";
-  var sub = document.createElement("div");
-  sub.style.cssText = "font-size:12px;color:#475569;margin-bottom:16px";
-  sub.textContent = today;
-  P.appendChild(title);
-  P.appendChild(sub);
-
-  // 统计卡片
-  var statGrid = document.createElement("div");
-  statGrid.style.cssText = "display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px";
-  var statDefs = [
-    {k:"present",l:"出席",c:"#10b981",icon:"✅"},
-    {k:"late",l:"迟到",c:"#f59e0b",icon:"⏰"},
-    {k:"late5",l:"迟到5+",c:"#ef4444",icon:"⚠️"},
-    {k:"absent",l:"缺席",c:"#ef4444",icon:"❌"},
-    {k:"sick",l:"病假",c:"#6366f1",icon:"🤒"},
-    {k:"activity",l:"活动",c:"#64748b",icon:"🏃"}
-  ];
-  for(var di=0;di<statDefs.length;di++){
-    var sd = statDefs[di];
-    var card = document.createElement("div");
-    card.style.cssText = "background:#111827;border:1px solid #1e2a3a;border-radius:10px;padding:10px;text-align:center";
-    card.innerHTML = '<div style="font-size:18px">'+sd.icon+'</div>'
-      +'<div style="font-size:20px;font-weight:800;color:'+sd.c+'">'+counts[sd.k]+'</div>'
-      +'<div style="font-size:11px;color:#64748b">'+sd.l+'</div>';
-    statGrid.appendChild(card);
-  }
-  P.appendChild(statGrid);
-
-  // 筛选按钮
-  var filterBar = document.createElement("div");
-  filterBar.id = "roll-filters";
-  filterBar.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px";
-  var filters = [
-    {k:"all",l:"全部"},
-    {k:"absent",l:"❌ 缺席"},
-    {k:"late",l:"⏰ 迟到"},
-    {k:"late5",l:"⚠️ 迟到5+"},
-    {k:"sick",l:"🤒 病假"},
-    {k:"present",l:"✅ 出席"}
-  ];
-  for(var fi=0;fi<filters.length;fi++){
-    var btn = document.createElement("button");
-    btn.textContent = filters[fi].l;
-    btn.setAttribute("data-f", filters[fi].k);
-    btn.setAttribute("onclick", "_renderRollList('"+filters[fi].k+"')");
-    btn.style.cssText = "padding:5px 12px;border:none;border-radius:6px;font-size:12px;cursor:pointer;background:#1e2a3a;color:#94a3b8";
-    filterBar.appendChild(btn);
-  }
-  P.appendChild(filterBar);
-
-  // 列表容器
-  var listDiv = document.createElement("div");
-  listDiv.id = "roll-list";
-  P.appendChild(listDiv);
-
-  // 直接渲染全部（不依赖外部函数）
-  var sColors = {present:"#10b981",late:"#f59e0b",late5:"#ef4444",absent:"#ef4444",sick:"#6366f1",activity:"#64748b"};
   var sLabels = {present:"出席",late:"迟到",late5:"迟到5+",absent:"缺席",sick:"病假",activity:"活动"};
-  
-  // 调试信息
-  var debugDiv = document.createElement("div");
-  debugDiv.style.cssText = "background:#1e2a3a;border-radius:8px;padding:8px;margin-bottom:8px;font-size:11px;color:#94a3b8;font-family:monospace";
-  debugDiv.textContent = "学生数:"+allStus.length+" 记录数:"+rows.length+" 日期:"+today+" cilog样本:cilog:"+(allStus[0]?allStus[0].id:"-")+":"+today+":"+CI_TASKS[0].id;
-  listDiv.appendChild(debugDiv);
-
-  if(!rows.length){
-    listDiv.innerHTML += '<div style="color:#475569;font-size:13px;text-align:center;padding:30px">今日暂无点名记录</div>';
-  } else {
-    for(var xi=0;xi<rows.length;xi++){
-      var xr = rows[xi];
-      var xrow = document.createElement("div");
-      xrow.style.cssText = "display:flex;align-items:center;gap:8px;background:#111827;border-radius:8px;padding:10px 12px;margin-bottom:6px";
-      xrow.innerHTML =
-        '<span style="flex:1;font-weight:600;color:#e2e8f0;font-size:14px">'+esc(xr.stu.name)+'</span>'+
-        '<span style="color:#475569;font-size:11px">'+esc(xr.stu.room)+'室</span>'+
-        '<span style="color:#64748b;font-size:11px;min-width:60px;text-align:center">'+esc(xr.task.name)+'</span>'+
-        '<span style="color:'+(sColors[xr.status]||"#64748b")+';font-weight:700;font-size:13px;min-width:44px;text-align:right">'+(sLabels[xr.status]||xr.status)+'</span>';
-      listDiv.appendChild(xrow);
-    }
+  var lines = ["﻿日期,学号,姓名,房间,任务,状态"]; // BOM for Excel 中文
+  for(var i=0;i<_rollAdminRows.length;i++){
+    var r = _rollAdminRows[i];
+    lines.push([
+      dateStr,
+      r.stu.id,
+      r.stu.name,
+      r.stu.room+"室",
+      r.task.name,
+      sLabels[r.status]||r.status
+    ].join(","));
   }
+  var csv = lines.join("\n");
+  var blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "点名记录_"+dateStr+".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast("✅ 已导出 点名记录_"+dateStr+".csv");
 }
 
+
+async function _exportRollRange(days){
+  var endDate = new Date();
+  var startDate = new Date();
+  startDate.setDate(endDate.getDate() - days + 1);
+  var sd = startDate.toISOString().slice(0,10);
+  var ed = endDate.toISOString().slice(0,10);
+  await _exportRollCSV(sd, ed);
+}
+
+function _showRangeExport(){
+  var b = OM("📥 导出自定义范围");
+  var r1 = document.createElement("div");
+  r1.style.cssText = "margin-bottom:10px";
+  r1.innerHTML = '<label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px">开始日期</label>';
+  var s1 = document.createElement("input");
+  s1.type = "date"; s1.style.cssText = "width:100%;background:#1e2a3a;border:1px solid #2d3748;border-radius:8px;padding:8px;color:#e2e8f0;font-size:13px;box-sizing:border-box";
+  var d = new Date(); d.setDate(d.getDate()-7);
+  s1.value = d.toISOString().slice(0,10);
+  r1.appendChild(s1); b.appendChild(r1);
+
+  var r2 = document.createElement("div");
+  r2.style.cssText = "margin-bottom:14px";
+  r2.innerHTML = '<label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px">结束日期</label>';
+  var s2 = document.createElement("input");
+  s2.type = "date"; s2.style.cssText = "width:100%;background:#1e2a3a;border:1px solid #2d3748;border-radius:8px;padding:8px;color:#e2e8f0;font-size:13px;box-sizing:border-box";
+  s2.value = new Date().toISOString().slice(0,10);
+  r2.appendChild(s2); b.appendChild(r2);
+
+  var exportRangeBtn = mkBtn("📥 导出","bp",async function(){
+    if(s1.value > s2.value){ toast("开始日期不能晚于结束日期",true); return; }
+    document.querySelector(".modal-overlay").remove();
+    await _exportRollCSV(s1.value, s2.value);
+  });
+  exportRangeBtn.style.width = "100%";
+  b.appendChild(exportRangeBtn);
+}
+
+async function _exportRollCSV(startDate, endDate){
+  toast("正在准备导出，请稍候…");
+
+  // 生成日期列表
+  var dates = [];
+  var cur = new Date(startDate);
+  var end = new Date(endDate);
+  while(cur <= end){
+    dates.push(cur.toISOString().slice(0,10));
+    cur.setDate(cur.getDate()+1);
+  }
+
+  var sLabels = {present:"出席",late:"迟到",late5:"迟到5+",absent:"缺席",sick:"病假",activity:"活动"};
+  var lines = ["﻿日期,学号,姓名,房间,性别,任务,状态"];
+
+  for(var di=0;di<dates.length;di++){
+    var dateStr = dates[di];
+    for(var si=0;si<_rollAdminStus.length;si++){
+      var stu = _rollAdminStus[si];
+      for(var ti=0;ti<CI_TASKS.length;ti++){
+        var task = CI_TASKS[ti];
+        var log = await DB.get("cilog:"+stu.id+":"+dateStr+":"+task.id);
+        if(log){
+          lines.push([
+            dateStr,
+            stu.id,
+            stu.name,
+            stu.room+"室",
+            stu.gender==="M"?"男":"女",
+            task.name,
+            sLabels[log.status]||log.status
+          ].join(","));
+        }
+      }
+    }
+  }
+
+  if(lines.length <= 1){
+    toast("所选日期范围内暂无点名记录",true);
+    return;
+  }
+
+  var filename = startDate===endDate
+    ? "点名记录_"+startDate+".csv"
+    : "点名记录_"+startDate+"至"+endDate+".csv";
+
+  var csv = lines.join("\n");
+  var blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast("✅ 已导出 "+filename+"（"+(lines.length-1)+"条记录）");
+}
 
 async function renderDutyAdmin(){
   var P=document.getElementById("p9");P.innerHTML="<div style='color:#64748b;padding:20px'>加载中…</div>";
